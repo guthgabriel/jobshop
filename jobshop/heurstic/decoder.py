@@ -1,8 +1,8 @@
 import numpy as np
 from jobshop.params import JobShopParams
 from jobshop.heurstic.operations import Graph
-from jobshop.heurstic.evaluation import calc_makespan
-
+from jobshop.heurstic.evaluation import calc_makespan, calc_tails
+from jobshop.heurstic.local_search import get_critical, local_search
 
 class Decoder(JobShopParams):
     
@@ -89,11 +89,71 @@ class Decoder(JobShopParams):
         
         # Initialize graph
         graph = Graph(self.machines, self.jobs, self.p_times, self.seq)
-        for (m, j) in Q:
+        #for (m, j) in Q:
+        #    graph.M[m].add_job(j)
+        C = 0
+
+        while len(Q) >= 1:
+            Q_aux = Q[0:4]
+            alpha = np.random.uniform(0.3,0.9)
+            H = {}
+            R = {}
+            S = []
+            for q in Q_aux:
+            
+                # Add new item to labeled
+                m, j = q
+                d = graph.O[m, j].duration
+                r = 0
+                
+                # Get preceding
+                PJ = graph.precede_job(m, j)
+                prev_jobs = graph.M[m].jobs
+                if len(prev_jobs) >= 1:
+                    last_job = graph.M[m].jobs[-1]
+                    PM = graph.O[m, last_job]
+                else:
+                    PM = None
+                
+                # Update minumum release
+                if PJ is not None:
+                    r = max(r, PJ.release + PJ.duration)
+                if PM is not None:
+                    r = max(r, PM.release + PM.duration)
+                R[q] = r
+                
+                # Update C_pot
+                C_pot = max(r + d, C)
+                H[q] = C_pot
+
+            min_sol = min(H.values())
+            max_sol = max(H.values())
+            atol = min_sol + (1 - alpha) * (max_sol - min_sol)
+
+            # Iterate over candidates
+            for q, C_pot in H.items():
+                if C_pot <= atol:
+                    S.append(q)
+                else:
+                    pass
+                
+            # Add random element
+            idx = np.random.choice(len(S))
+            new_element = S[idx]
+            m, j = new_element
+            graph.O[m, j].release = R[m, j]
             graph.M[m].add_job(j)
+            Q.pop(Q.index((m, j)))
+            C = H[m, j]
         
+        
+        #print(graph.o.items())
+
         # Calculate makespan
         calc_makespan(graph)
+        calc_tails(graph)
+        get_critical(graph)
+        graph = local_search(graph)
         
         return graph
     

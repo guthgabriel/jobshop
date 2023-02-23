@@ -54,6 +54,9 @@ class Decoder(JobShopParams):
             
         else:
             graph = self.build_graph(pheno)
+            calc_tails(graph)                    
+            get_critical(graph)
+            graph = local_search(graph)
             C = graph.C
             self.known_solutions[pheno_hash] = C
         
@@ -89,12 +92,14 @@ class Decoder(JobShopParams):
         
         # Initialize graph
         graph = Graph(self.machines, self.jobs, self.p_times, self.seq)
-        #for (m, j) in Q:
-        #    graph.M[m].add_job(j)
+        # for (m, j) in Q:
+        #     graph.M[m].add_job(j)
         C = 0
 
         while len(Q) >= 1:
-            Q_aux = Q[0:4]
+            Q_aux = np.array(Q[0:3])
+            Q_aux = Q_aux[np.unique(Q_aux[:,0], return_index=True)[1]]
+
             alpha = np.random.uniform(0.3,0.9)
             H = {}
             R = {}
@@ -120,11 +125,11 @@ class Decoder(JobShopParams):
                     r = max(r, PJ.release + PJ.duration)
                 if PM is not None:
                     r = max(r, PM.release + PM.duration)
-                R[q] = r
+                R[m,j] = r
                 
                 # Update C_pot
                 C_pot = max(r + d, C)
-                H[q] = C_pot
+                H[m,j] = C_pot
 
             min_sol = min(H.values())
             max_sol = max(H.values())
@@ -151,9 +156,6 @@ class Decoder(JobShopParams):
 
         # Calculate makespan
         calc_makespan(graph)
-        calc_tails(graph)
-        get_critical(graph)
-        graph = local_search(graph)
         
         return graph
     
